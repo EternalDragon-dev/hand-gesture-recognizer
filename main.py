@@ -8,6 +8,7 @@ import mediapipe as mp
 import numpy as np
 
 from filters import OneEuroFilter2D, FingerCountDebouncer
+from gesture_engine import GestureEngine, Gesture
 
 # MediaPipe setup
 mp_hands = mp.solutions.hands
@@ -29,8 +30,19 @@ PALM_INDICES = [0, 1, 5, 9, 13, 17]
 COLOR_LANDMARK = (0, 255, 255)    # yellow – regular landmarks
 COLOR_FINGERTIP = (0, 255, 0)     # green  – fingertips
 COLOR_CENTER = (255, 0, 255)      # magenta – palm center
-COLOR_CONNECTION = (255, 200, 0)  # cyan-ish – bone connections
+COLOR_CONNECTION = (255, 200, 0)  # cyan-ish – bone connections (idle)
 COLOR_LABEL = (255, 255, 255)     # white – text
+
+# Gesture-aware skeleton colours (BGR)
+GESTURE_COLORS = {
+    Gesture.NONE:        (255, 200, 0),   # cyan (default)
+    Gesture.PINCH:       (0, 140, 255),   # orange
+    Gesture.POINT:       (255, 100, 0),   # blue
+    Gesture.SWIPE_LEFT:  (0, 255, 0),     # green
+    Gesture.SWIPE_RIGHT: (0, 255, 0),
+    Gesture.SWIPE_UP:    (0, 255, 0),
+    Gesture.SWIPE_DOWN:  (0, 255, 0),
+}
 
 
 def compute_palm_center(landmarks, w: int, h: int) -> tuple[int, int]:
@@ -40,9 +52,10 @@ def compute_palm_center(landmarks, w: int, h: int) -> tuple[int, int]:
     return int(np.mean(xs)), int(np.mean(ys))
 
 
-def draw_hand(image, hand_landmarks, w: int, h: int) -> None:
+def draw_hand(image, hand_landmarks, w: int, h: int, conn_color=None) -> None:
     """Draw landmarks, connections, fingertip labels, and palm center."""
     landmarks = hand_landmarks.landmark
+    color = conn_color if conn_color is not None else COLOR_CONNECTION
 
     # Draw bone connections
     mp_drawing.draw_landmarks(
@@ -50,7 +63,7 @@ def draw_hand(image, hand_landmarks, w: int, h: int) -> None:
         hand_landmarks,
         mp_hands.HAND_CONNECTIONS,
         mp_drawing.DrawingSpec(color=COLOR_LANDMARK, thickness=2, circle_radius=3),
-        mp_drawing.DrawingSpec(color=COLOR_CONNECTION, thickness=2),
+        mp_drawing.DrawingSpec(color=color, thickness=2),
     )
 
     # Highlight and label each fingertip
@@ -97,6 +110,11 @@ def main() -> None:
     # Per-hand filters: dict of {landmark_index: OneEuroFilter2D}
     hand_filters: list[dict[int, OneEuroFilter2D]] = [{}, {}]
     finger_debouncers = [FingerCountDebouncer(), FingerCountDebouncer()]
+    gesture_engines = [GestureEngine(), GestureEngine()]
+
+    # Gesture toast state
+    gesture_toast = ""
+    toast_expiry = 0.0
 
     with mp_hands.Hands(
         static_image_mode=False,
@@ -136,34 +154,73 @@ def main() -> None:
                             )
                         lm.x, lm.y = hand_filters[hand_idx][i](lm.x, lm.y, t)
 
-                    draw_hand(frame, hand_lm, w, h)
-
-                    # Show debounced finger count and handedness
-                    label = hand_info.classification[0].label  # "Left" / "Right"
+                    # Detect gesture
                     raw_fingers = count_fingers_up(hand_lm.landmark)
                     fingers = finger_debouncers[hand_idx].update(raw_fingers)
+                    detected = gesture_engines[hand_idx].update(
+                        hand_lm.landmark, fingers
+                    )
+
+                    # Use gesture-aware skeleton colour
+                    conn_color = GESTURE_COLORS.get(detected, COLOR_CONNECTION)
+                    draw_hand(frame, hand_lm, w, h, conn_color=conn_color)
+
+                    # Show debounced finger count, handedness, and gesture
+                    label = hand_info.classification[0].label  # "Left" / "Right"
                     pcx, pcy = compute_palm_center(hand_lm.landmark, w, h)
+                    info = f"{label} hand | Fingers: {fingers}"
+                    if detected != Gesture.NONE:
+                        info += f" | {detected.value}"
                     cv2.putText(
-                        frame,
-                        f"{label} hand | Fingers: {fingers}",
-                        (pcx - 60, pcy + 30),
+                        frame, info,
+                        (pcx - 80, pcy + 30),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
+                        0.55,
                         COLOR_LABEL,
                         2,
                         cv2.LINE_AA,
                     )
+
+                    # Gesture toast (top of screen)
+                    if detected != Gesture.NONE:
+                        gesture_toast = detected.value
+                        toast_expiry = time.monotonic() + 1.0
+
+                    # Draw cursor for point / pinch
+                    if gesture_engines[hand_idx].cursor is not None:
+                        cx = int(gesture_engines[hand_idx].cursor[0] * w)
+                        cy = int(gesture_engines[hand_idx].cursor[1] * h)
+                        color = (0, 140, 255) if detected == Gesture.PINCH else (255, 100, 0)
+                        cv2.circle(frame, (cx, cy), 18, color, 2)
+                        # Crosshair
+                        cv2.line(frame, (cx - 26, cy), (cx - 14, cy), color, 2)
+                        cv2.line(frame, (cx + 14, cy), (cx + 26, cy), color, 2)
+                        cv2.line(frame, (cx, cy - 26), (cx, cy - 14), color, 2)
+                        cv2.line(frame, (cx, cy + 14), (cx, cy + 26), color, 2)
+                        if detected == Gesture.PINCH:
+                            cv2.circle(frame, (cx, cy), 5, (0, 140, 255), cv2.FILLED)
 
                 # Reset filters for hands that disappeared
                 active = len(results.multi_hand_landmarks)
                 for slot in range(active, 2):
                     hand_filters[slot].clear()
                     finger_debouncers[slot].reset()
+                    gesture_engines[slot].reset()
             else:
                 # No hands — reset all filters
                 for slot in range(2):
                     hand_filters[slot].clear()
                     finger_debouncers[slot].reset()
+                    gesture_engines[slot].reset()
+
+            # Draw gesture toast at top of screen
+            if gesture_toast and time.monotonic() < toast_expiry:
+                cv2.putText(
+                    frame, gesture_toast,
+                    (w // 2 - 100, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1.0, (255, 255, 255), 2, cv2.LINE_AA,
+                )
 
             cv2.imshow("Hand Gesture Recognizer (q to quit)", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):

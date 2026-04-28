@@ -7,19 +7,35 @@ struct HandOverlayView: View {
 
     let hands: [HandData]
     let frameSize: CGSize
+    var gesture: HandGesture = .none
+    var cursorPosition: CGPoint? = nil
 
     // Colours matching the Python version (BGR → SwiftUI)
     private let landmarkColor  = Color.yellow
     private let fingertipColor = Color.green
     private let centerColor    = Color(red: 1, green: 0, blue: 1) // magenta
-    private let connectionColor = Color.cyan
     private let labelColor     = Color.white
+
+    /// Skeleton colour changes based on gesture state.
+    private var connectionColor: Color {
+        switch gesture {
+        case .pinch:                         return .orange
+        case .point:                         return .blue
+        case .swipeLeft, .swipeRight,
+             .swipeUp, .swipeDown:           return .green
+        case .none:                          return .cyan
+        }
+    }
 
     var body: some View {
         GeometryReader { geometry in
             Canvas { context, size in
                 for hand in hands {
                     drawHand(context: &context, hand: hand, size: size)
+                }
+                // Draw cursor reticle when pointing / clicking
+                if let cursor = cursorPosition {
+                    drawCursor(context: &context, at: cursor, size: size)
                 }
             }
         }
@@ -95,6 +111,38 @@ struct HandOverlayView: View {
                     .foregroundColor(labelColor),
                 at: CGPoint(x: sp.x, y: sp.y + 30)
             )
+        }
+    }
+
+    // MARK: - Cursor reticle
+
+    private func drawCursor(context: inout GraphicsContext, at point: CGPoint, size: CGSize) {
+        let sp = toScreen(point, in: size)
+        let radius: CGFloat = 18
+        let color: Color = gesture == .pinch ? .orange : .blue
+
+        // Outer ring
+        let ring = Path(ellipseIn: CGRect(x: sp.x - radius, y: sp.y - radius,
+                                          width: radius * 2, height: radius * 2))
+        context.stroke(ring, with: .color(color), lineWidth: 2.5)
+
+        // Crosshair lines
+        let len: CGFloat = 8
+        var cross = Path()
+        cross.move(to: CGPoint(x: sp.x - radius - len, y: sp.y))
+        cross.addLine(to: CGPoint(x: sp.x - radius + 4, y: sp.y))
+        cross.move(to: CGPoint(x: sp.x + radius - 4, y: sp.y))
+        cross.addLine(to: CGPoint(x: sp.x + radius + len, y: sp.y))
+        cross.move(to: CGPoint(x: sp.x, y: sp.y - radius - len))
+        cross.addLine(to: CGPoint(x: sp.x, y: sp.y - radius + 4))
+        cross.move(to: CGPoint(x: sp.x, y: sp.y + radius - 4))
+        cross.addLine(to: CGPoint(x: sp.x, y: sp.y + radius + len))
+        context.stroke(cross, with: .color(color), lineWidth: 2)
+
+        // Center dot (filled when clicking)
+        if gesture == .pinch {
+            let dot = CGRect(x: sp.x - 5, y: sp.y - 5, width: 10, height: 10)
+            context.fill(Path(ellipseIn: dot), with: .color(.orange))
         }
     }
 

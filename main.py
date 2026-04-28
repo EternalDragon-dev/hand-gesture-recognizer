@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Hand Gesture Recognizer – maps fingers and palm center in real-time."""
 
+import time
+
 import cv2
 import mediapipe as mp
 import numpy as np
+
+from filters import OneEuroFilter2D, FingerCountDebouncer
 
 # MediaPipe setup
 mp_hands = mp.solutions.hands
@@ -90,6 +94,10 @@ def main() -> None:
 
     print("Hand Gesture Recognizer – press 'q' to quit.")
 
+    # Per-hand filters: dict of {landmark_index: OneEuroFilter2D}
+    hand_filters: list[dict[int, OneEuroFilter2D]] = [{}, {}]
+    finger_debouncers = [FingerCountDebouncer(), FingerCountDebouncer()]
+
     with mp_hands.Hands(
         static_image_mode=False,
         max_num_hands=2,
@@ -104,21 +112,36 @@ def main() -> None:
             # Flip horizontally for a mirror-like view
             frame = cv2.flip(frame, 1)
             h, w, _ = frame.shape
+            t = time.monotonic()
 
             # Convert to RGB for MediaPipe
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = hands.process(rgb)
 
             if results.multi_hand_landmarks:
-                for hand_lm, hand_info in zip(
-                    results.multi_hand_landmarks,
-                    results.multi_handedness,
+                for hand_idx, (hand_lm, hand_info) in enumerate(
+                    zip(
+                        results.multi_hand_landmarks,
+                        results.multi_handedness,
+                    )
                 ):
+                    if hand_idx >= 2:
+                        break
+
+                    # Smooth each landmark with OneEuroFilter
+                    for i, lm in enumerate(hand_lm.landmark):
+                        if i not in hand_filters[hand_idx]:
+                            hand_filters[hand_idx][i] = OneEuroFilter2D(
+                                min_cutoff=1.0, beta=0.007, d_cutoff=1.0
+                            )
+                        lm.x, lm.y = hand_filters[hand_idx][i](lm.x, lm.y, t)
+
                     draw_hand(frame, hand_lm, w, h)
 
-                    # Show finger count and handedness
+                    # Show debounced finger count and handedness
                     label = hand_info.classification[0].label  # "Left" / "Right"
-                    fingers = count_fingers_up(hand_lm.landmark)
+                    raw_fingers = count_fingers_up(hand_lm.landmark)
+                    fingers = finger_debouncers[hand_idx].update(raw_fingers)
                     pcx, pcy = compute_palm_center(hand_lm.landmark, w, h)
                     cv2.putText(
                         frame,
@@ -130,6 +153,17 @@ def main() -> None:
                         2,
                         cv2.LINE_AA,
                     )
+
+                # Reset filters for hands that disappeared
+                active = len(results.multi_hand_landmarks)
+                for slot in range(active, 2):
+                    hand_filters[slot].clear()
+                    finger_debouncers[slot].reset()
+            else:
+                # No hands — reset all filters
+                for slot in range(2):
+                    hand_filters[slot].clear()
+                    finger_debouncers[slot].reset()
 
             cv2.imshow("Hand Gesture Recognizer (q to quit)", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):

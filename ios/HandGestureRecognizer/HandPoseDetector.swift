@@ -20,6 +20,17 @@ final class HandPoseDetector: ObservableObject {
         .littleMCP, .littlePIP, .littleDIP, .littleTip,
     ]
 
+    // MARK: - Smoothing (OneEuroFilter per joint, per hand slot)
+
+    /// Two hand slots (index 0 and 1), each mapping joint → filter.
+    private var jointFilters: [[VNHumanHandPoseObservation.JointName: OneEuroFilter2D]] = [[:], [:]]
+
+    // MARK: - Temporal debouncing for finger count
+
+    private var fingerCountBuffers: [[Int]] = [[], []]  // rolling window per hand slot
+    private let debounceWindow = 5
+    private let debounceThreshold = 3
+
     // MARK: - Frame processing
 
     /// Call this from the camera callback (background queue).
@@ -35,6 +46,8 @@ final class HandPoseDetector: ObservableObject {
                 }
             }
         }
+
+        let timestamp = CACurrentMediaTime()
 
         // Run hand pose request
         let request = VNDetectHumanHandPoseRequest()
@@ -53,7 +66,17 @@ final class HandPoseDetector: ObservableObject {
             return
         }
 
-        let detected = observations.compactMap { extractHandData(from: $0) }
+        var detected: [HandData] = []
+        for (index, observation) in observations.prefix(2).enumerated() {
+            if let hand = extractHandData(from: observation, slotIndex: index, timestamp: timestamp) {
+                detected.append(hand)
+            }
+        }
+
+        // Reset filters for unused slots
+        if observations.count < 2 {
+            resetFilters(for: 1)
+        }
 
         DispatchQueue.main.async { [weak self] in
             self?.hands = detected
@@ -62,13 +85,24 @@ final class HandPoseDetector: ObservableObject {
 
     // MARK: - Extraction
 
-    private func extractHandData(from observation: VNHumanHandPoseObservation) -> HandData? {
+    private func extractHandData(
+        from observation: VNHumanHandPoseObservation,
+        slotIndex: Int,
+        timestamp: Double
+    ) -> HandData? {
         var landmarks: [VNHumanHandPoseObservation.JointName: CGPoint] = [:]
 
         for joint in Self.allJoints {
             guard let point = try? observation.recognizedPoint(joint),
                   point.confidence > 0.3 else { continue }
-            landmarks[joint] = point.location   // normalized, bottom-left origin
+
+            // Apply OneEuroFilter to smooth each joint
+            let raw = point.location
+            if jointFilters[slotIndex][joint] == nil {
+                jointFilters[slotIndex][joint] = OneEuroFilter2D(minCutoff: 1.0, beta: 0.007, dCutoff: 1.0)
+            }
+            let smoothed = jointFilters[slotIndex][joint]!.filter(raw, at: timestamp)
+            landmarks[joint] = smoothed
         }
 
         // Need at least 15 of 21 landmarks for a usable detection
@@ -81,13 +115,43 @@ final class HandPoseDetector: ObservableObject {
         default:       chirality = .unknown
         }
 
-        let fingersUp = countFingers(landmarks: landmarks)
+        let rawFingers = countFingers(landmarks: landmarks)
+        let debouncedFingers = debounceFingersCount(rawFingers, slot: slotIndex)
 
         return HandData(
             landmarks: landmarks,
             chirality: chirality,
-            fingersExtended: fingersUp
+            fingersExtended: debouncedFingers
         )
+    }
+
+    // MARK: - Filter management
+
+    private func resetFilters(for slot: Int) {
+        for key in jointFilters[slot].keys {
+            jointFilters[slot][key]?.reset()
+        }
+        jointFilters[slot].removeAll()
+        fingerCountBuffers[slot].removeAll()
+    }
+
+    // MARK: - Temporal debouncing
+
+    private func debounceFingersCount(_ raw: Int, slot: Int) -> Int {
+        fingerCountBuffers[slot].append(raw)
+        if fingerCountBuffers[slot].count > debounceWindow {
+            fingerCountBuffers[slot].removeFirst()
+        }
+
+        // Majority vote: return the count that appears >= threshold times
+        let buf = fingerCountBuffers[slot]
+        for candidate in Set(buf) {
+            if buf.filter({ $0 == candidate }).count >= debounceThreshold {
+                return candidate
+            }
+        }
+        // No majority → return raw (will settle within a few frames)
+        return raw
     }
 
     // MARK: - Finger counting
@@ -97,7 +161,6 @@ final class HandPoseDetector: ObservableObject {
         var count = 0
 
         // Thumb: extended when tip is further from wrist than IP joint.
-        // This is orientation-independent (works regardless of mirroring/chirality).
         if let thumbTip = landmarks[.thumbTip],
            let thumbIP  = landmarks[.thumbIP],
            let wrist    = landmarks[.wrist] {
@@ -107,7 +170,6 @@ final class HandPoseDetector: ObservableObject {
         }
 
         // Other four fingers: tip above PIP means extended.
-        // In Vision coordinates y increases upward, so tip.y > pip.y = extended.
         let fingerPairs: [(VNHumanHandPoseObservation.JointName,
                            VNHumanHandPoseObservation.JointName)] = [
             (.indexTip,  .indexPIP),

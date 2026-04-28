@@ -15,6 +15,7 @@
 		089C1665A1B2C3D400000025 /* HandOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089C1665A1B2C3D400000015 /* HandOverlayView.swift */; };
 		089C1665A1B2C3D400000026 /* HandData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089C1665A1B2C3D400000016 /* HandData.swift */; };
 		089C1665A1B2C3D400000027 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 089C1665A1B2C3D400000017 /* Assets.xcassets */; };
+		089C1665A1B2C3D400000028 /* OneEuroFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089C1665A1B2C3D400000030 /* OneEuroFilter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +28,7 @@
 		089C1665A1B2C3D400000015 /* HandOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandOverlayView.swift; sourceTree = "<group>"; };
 		089C1665A1B2C3D400000016 /* HandData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandData.swift; sourceTree = "<group>"; };
 		089C1665A1B2C3D400000017 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		089C1665A1B2C3D400000030 /* OneEuroFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneEuroFilter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,6 +68,7 @@
 				089C1665A1B2C3D400000014 /* CameraPreviewView.swift */,
 				089C1665A1B2C3D400000015 /* HandOverlayView.swift */,
 				089C1665A1B2C3D400000016 /* HandData.swift */,
+				089C1665A1B2C3D400000030 /* OneEuroFilter.swift */,
 				089C1665A1B2C3D400000017 /* Assets.xcassets */,
 			);
 			path = HandGestureRecognizer;
@@ -99,7 +102,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1540;
-				LastUpgradeCheck = 1540;
+				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					089C1665A1B2C3D40000000B = {
 						CreatedOnToolsVersion = 15.4;
@@ -147,6 +150,7 @@
 				089C1665A1B2C3D400000024 /* CameraPreviewView.swift in Sources */,
 				089C1665A1B2C3D400000025 /* HandOverlayView.swift in Sources */,
 				089C1665A1B2C3D400000026 /* HandData.swift in Sources */,
+				089C1665A1B2C3D400000028 /* OneEuroFilter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,6 +192,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = ZWMJVG9ZS7;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -211,6 +216,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -251,6 +257,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = ZWMJVG9ZS7;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -267,6 +274,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -279,7 +287,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to detect and track hand gestures in real time.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -303,7 +310,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to detect and track hand gestures in real time.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

@@ -15,6 +15,7 @@ struct HandOverlayView: View {
     private let fingertipColor = Color.green
     private let centerColor    = Color(red: 1, green: 0, blue: 1) // magenta
     private let labelColor     = Color.white
+    private let trailColor     = Color(red: 0.3, green: 0.8, blue: 1.0) // light blue trail
 
     /// Skeleton colour changes based on gesture state.
     private var connectionColor: Color {
@@ -27,9 +28,17 @@ struct HandOverlayView: View {
         }
     }
 
+    // MARK: - Fingertip trail state (persists across redraws via wrapper)
+
+    /// External trail buffer — fed by ContentView.
+    var trailPoints: [CGPoint]
+
     var body: some View {
         GeometryReader { geometry in
             Canvas { context, size in
+                // Draw trail first (behind hand)
+                drawTrail(context: &context, size: size)
+
                 for hand in hands {
                     drawHand(context: &context, hand: hand, size: size)
                 }
@@ -111,6 +120,36 @@ struct HandOverlayView: View {
                     .foregroundColor(labelColor),
                 at: CGPoint(x: sp.x, y: sp.y + 30)
             )
+        }
+    }
+
+    // MARK: - Fingertip trail
+
+    private func drawTrail(context: inout GraphicsContext, size: CGSize) {
+        guard trailPoints.count >= 2 else { return }
+
+        let screenPoints = trailPoints.map { toScreen($0, in: size) }
+        let count = screenPoints.count
+
+        for i in 1..<count {
+            let progress = CGFloat(i) / CGFloat(count)          // 0→1
+            let opacity = 0.1 + progress * 0.9                  // 0.1→1.0
+            let lineWidth = 1.0 + progress * 2.5                 // 1.0→3.5
+
+            var segment = Path()
+            segment.move(to: screenPoints[i - 1])
+            segment.addLine(to: screenPoints[i])
+            context.stroke(
+                segment,
+                with: .color(trailColor.opacity(opacity)),
+                lineWidth: lineWidth
+            )
+        }
+
+        // Glow dot at the newest point
+        if let tip = screenPoints.last {
+            let glow = CGRect(x: tip.x - 5, y: tip.y - 5, width: 10, height: 10)
+            context.fill(Path(ellipseIn: glow), with: .color(trailColor))
         }
     }
 

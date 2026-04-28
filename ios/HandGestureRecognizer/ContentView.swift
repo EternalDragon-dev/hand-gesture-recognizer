@@ -6,9 +6,15 @@ struct ContentView: View {
     @StateObject private var handDetector  = HandPoseDetector()
     @StateObject private var gestureEngine = GestureEngine()
 
-    // Auto-dismiss timer for gesture toast
+    // Gesture toast state
     @State private var lastGestureLabel: String = ""
+    @State private var lastGestureIcon: String = ""
     @State private var showGestureToast = false
+
+    // Fingertip trail buffer (normalised Vision coords)
+    @State private var trailPoints: [CGPoint] = []
+    private let maxTrailLength = 12
+    @State private var framesWithoutHand = 0
 
     var body: some View {
         ZStack {
@@ -20,23 +26,30 @@ struct ContentView: View {
             HandOverlayView(hands: handDetector.hands,
                             frameSize: handDetector.frameSize,
                             gesture: gestureEngine.gesture,
-                            cursorPosition: gestureEngine.cursorPosition)
+                            cursorPosition: gestureEngine.cursorPosition,
+                            trailPoints: trailPoints)
                 .ignoresSafeArea()
 
             // UI chrome
             VStack {
                 titleBar
 
-                // Gesture toast
+                // Gesture toast with SF Symbol icon
                 if showGestureToast {
-                    Text(lastGestureLabel)
-                        .font(.title3.bold())
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.black.opacity(0.7))
-                        .clipShape(Capsule())
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                    HStack(spacing: 8) {
+                        if !lastGestureIcon.isEmpty {
+                            Image(systemName: lastGestureIcon)
+                                .font(.title3)
+                        }
+                        Text(lastGestureLabel)
+                            .font(.title3.bold())
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(Color.black.opacity(0.7))
+                    .clipShape(Capsule())
+                    .transition(.scale.combined(with: .opacity))
                 }
 
                 Spacer()
@@ -57,20 +70,48 @@ struct ContentView: View {
             // Feed the first detected hand into the gesture engine
             if let hand = newHands.first {
                 gestureEngine.update(with: hand)
+                framesWithoutHand = 0
+
+                // Update fingertip trail with index tip position
+                if let indexTip = hand.landmarks[.indexTip] {
+                    trailPoints.append(indexTip)
+                    if trailPoints.count > maxTrailLength {
+                        trailPoints.removeFirst()
+                    }
+                }
             } else {
+                framesWithoutHand += 1
+                if framesWithoutHand > 5 {
+                    trailPoints.removeAll()
+                }
                 gestureEngine.reset()
             }
         }
         .onChange(of: gestureEngine.gesture) { _, newGesture in
             guard newGesture != .none else { return }
             lastGestureLabel = newGesture.rawValue
-            withAnimation(.easeInOut(duration: 0.2)) { showGestureToast = true }
-            // Auto-dismiss after 1 second
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                withAnimation(.easeInOut(duration: 0.3)) { showGestureToast = false }
+            lastGestureIcon = gestureIcon(for: newGesture)
+            withAnimation(.spring(duration: 0.25)) { showGestureToast = true }
+            // Auto-dismiss after 1.2 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                withAnimation(.easeOut(duration: 0.3)) { showGestureToast = false }
             }
         }
         .statusBarHidden()
+    }
+
+    // MARK: - Helpers
+
+    private func gestureIcon(for gesture: HandGesture) -> String {
+        switch gesture {
+        case .swipeLeft:  return "arrow.left"
+        case .swipeRight: return "arrow.right"
+        case .swipeUp:    return "arrow.up"
+        case .swipeDown:  return "arrow.down"
+        case .pinch:      return "hand.pinch"
+        case .point:      return "hand.point.up.left"
+        case .none:       return ""
+        }
     }
 
     // MARK: - Sub-views

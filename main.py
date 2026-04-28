@@ -116,6 +116,11 @@ def main() -> None:
     gesture_toast = ""
     toast_expiry = 0.0
 
+    # Fingertip trail: list of (x_px, y_px) per hand slot
+    trail_buffers: list[list[tuple[int, int]]] = [[], []]
+    TRAIL_MAX = 12
+    frames_without_hand = [0, 0]
+
     with mp_hands.Hands(
         static_image_mode=False,
         max_num_hands=2,
@@ -186,6 +191,31 @@ def main() -> None:
                         gesture_toast = detected.value
                         toast_expiry = time.monotonic() + 1.0
 
+                    # Update fingertip trail
+                    ix_tip = hand_lm.landmark[8]
+                    trail_buffers[hand_idx].append(
+                        (int(ix_tip.x * w), int(ix_tip.y * h))
+                    )
+                    if len(trail_buffers[hand_idx]) > TRAIL_MAX:
+                        trail_buffers[hand_idx].pop(0)
+                    frames_without_hand[hand_idx] = 0
+
+                    # Draw fingertip trail (fading polyline)
+                    trail = trail_buffers[hand_idx]
+                    if len(trail) >= 2:
+                        for ti in range(1, len(trail)):
+                            progress = ti / len(trail)  # 0→1
+                            alpha = int(25 + progress * 230)  # 25→255
+                            thickness = max(1, int(1 + progress * 3))
+                            # Light blue trail colour with alpha via overlay
+                            overlay = frame.copy()
+                            cv2.line(overlay, trail[ti - 1], trail[ti],
+                                     (255, 200, 80), thickness, cv2.LINE_AA)
+                            cv2.addWeighted(overlay, progress, frame,
+                                            1 - progress * 0.3, 0, frame)
+                        # Glow dot at tip
+                        cv2.circle(frame, trail[-1], 5, (255, 200, 80), cv2.FILLED)
+
                     # Draw cursor for point / pinch
                     if gesture_engines[hand_idx].cursor is not None:
                         cx = int(gesture_engines[hand_idx].cursor[0] * w)
@@ -206,12 +236,18 @@ def main() -> None:
                     hand_filters[slot].clear()
                     finger_debouncers[slot].reset()
                     gesture_engines[slot].reset()
+                    frames_without_hand[slot] += 1
+                    if frames_without_hand[slot] > 5:
+                        trail_buffers[slot].clear()
             else:
                 # No hands — reset all filters
                 for slot in range(2):
                     hand_filters[slot].clear()
                     finger_debouncers[slot].reset()
                     gesture_engines[slot].reset()
+                    frames_without_hand[slot] += 1
+                    if frames_without_hand[slot] > 5:
+                        trail_buffers[slot].clear()
 
             # Draw gesture toast at top of screen
             if gesture_toast and time.monotonic() < toast_expiry:

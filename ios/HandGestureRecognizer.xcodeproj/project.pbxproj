@@ -17,6 +17,7 @@
 		089C1665A1B2C3D400000027 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 089C1665A1B2C3D400000017 /* Assets.xcassets */; };
 		089C1665A1B2C3D400000028 /* OneEuroFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089C1665A1B2C3D400000030 /* OneEuroFilter.swift */; };
 		089C1665A1B2C3D400000029 /* GestureEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089C1665A1B2C3D400000031 /* GestureEngine.swift */; };
+		089C1665A1B2C3D40000002A /* JointAngles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089C1665A1B2C3D400000032 /* JointAngles.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +32,7 @@
 		089C1665A1B2C3D400000017 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		089C1665A1B2C3D400000030 /* OneEuroFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneEuroFilter.swift; sourceTree = "<group>"; };
 		089C1665A1B2C3D400000031 /* GestureEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GestureEngine.swift; sourceTree = "<group>"; };
+		089C1665A1B2C3D400000032 /* JointAngles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JointAngles.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +74,7 @@
 				089C1665A1B2C3D400000016 /* HandData.swift */,
 				089C1665A1B2C3D400000030 /* OneEuroFilter.swift */,
 				089C1665A1B2C3D400000031 /* GestureEngine.swift */,
+				089C1665A1B2C3D400000032 /* JointAngles.swift */,
 				089C1665A1B2C3D400000017 /* Assets.xcassets */,
 			);
 			path = HandGestureRecognizer;
@@ -155,6 +158,7 @@
 				089C1665A1B2C3D400000026 /* HandData.swift in Sources */,
 				089C1665A1B2C3D400000028 /* OneEuroFilter.swift in Sources */,
 				089C1665A1B2C3D400000029 /* GestureEngine.swift in Sources */,
+				089C1665A1B2C3D40000002A /* JointAngles.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

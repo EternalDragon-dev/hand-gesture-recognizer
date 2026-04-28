@@ -9,6 +9,7 @@ import numpy as np
 
 from filters import OneEuroFilter2D, FingerCountDebouncer
 from gesture_engine import GestureEngine, Gesture
+from joint_angles import compute_joint_angles
 
 # MediaPipe setup
 mp_hands = mp.solutions.hands
@@ -170,6 +171,9 @@ def main() -> None:
                     conn_color = GESTURE_COLORS.get(detected, COLOR_CONNECTION)
                     draw_hand(frame, hand_lm, w, h, conn_color=conn_color)
 
+                    # Compute joint angles (available for robotics / logging)
+                    angles = compute_joint_angles(hand_lm.landmark)
+
                     # Show debounced finger count, handedness, and gesture
                     label = hand_info.classification[0].label  # "Left" / "Right"
                     pcx, pcy = compute_palm_center(hand_lm.landmark, w, h)
@@ -185,6 +189,16 @@ def main() -> None:
                         2,
                         cv2.LINE_AA,
                     )
+
+                    # Show index PIP angle as a sample (useful for servo mapping)
+                    if "index_pip" in angles:
+                        angle_text = f"Index PIP: {angles['index_pip']:.0f} deg"
+                        cv2.putText(
+                            frame, angle_text,
+                            (pcx - 60, pcy + 55),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.45, (200, 200, 200), 1, cv2.LINE_AA,
+                        )
 
                     # Gesture toast (top of screen)
                     if detected != Gesture.NONE:

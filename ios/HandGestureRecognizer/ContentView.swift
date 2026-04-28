@@ -69,7 +69,12 @@ struct ContentView: View {
         .onChange(of: handDetector.hands) { _, newHands in
             // Feed the first detected hand into the gesture engine
             if let hand = newHands.first {
-                gestureEngine.update(with: hand)
+                // Only process gestures when hand is in active depth zone
+                if hand.depthZone == .active {
+                    gestureEngine.update(with: hand)
+                } else {
+                    gestureEngine.reset()
+                }
                 framesWithoutHand = 0
 
                 // Update fingertip trail with index tip position

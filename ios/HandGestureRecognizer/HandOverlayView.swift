@@ -102,21 +102,27 @@ struct HandOverlayView: View {
             )
         }
 
-        // 5. Handedness + finger count (below palm center)
+        // 5. Handedness + finger count + depth zone (below palm center)
         if let center = hand.palmCenter {
             let sp = toScreen(center, in: size)
-            let info = "\(hand.chirality.rawValue) hand  |  Fingers: \(hand.fingersExtended)"
+            let depthIcon: String
+            switch hand.depthZone {
+            case .near:   depthIcon = "◉"   // too close
+            case .active: depthIcon = "●"   // good range
+            case .far:    depthIcon = "○"   // too far
+            }
+            let info = "\(hand.chirality.rawValue)  |  \(hand.fingersExtended)F  |  \(depthIcon) \(hand.depthZone.rawValue)"
 
             // Shadow for readability
             context.draw(
                 Text(info)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.black),
                 at: CGPoint(x: sp.x + 1, y: sp.y + 31)
             )
             context.draw(
                 Text(info)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(labelColor),
                 at: CGPoint(x: sp.x, y: sp.y + 30)
             )
